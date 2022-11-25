@@ -381,11 +381,11 @@ void TrajectoryGenerator::computeThread()
             return i(0) > 0.0;
         };
         
-        transformedPath.erase(begin(transformedPath), 
-                                        std::find_if(transformedPath.begin(),
-                                                transformedPath.end(),
-                                                greaterThanZero));
-        std::cout << "Erased the first X poses: " << m_path.size() - transformedPath.size() << std::endl;
+        //transformedPath.erase(begin(transformedPath), 
+        //                                std::find_if(transformedPath.begin(),
+        //                                        transformedPath.end(),
+        //                                        greaterThanZero));
+        //std::cout << "Erased the first X poses: " << m_path.size() - transformedPath.size() << std::endl;
         //m_path = transformedPath;
         //addWaypoints contains this transformation
         // apply the homogeneous transformation w_H_{unicycle}

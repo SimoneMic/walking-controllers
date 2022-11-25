@@ -1239,6 +1239,7 @@ bool WalkingModule::updateModule()
                 {
                     saveCoM = true;
                     m_wasInDoubleSupport = true;
+                    m_newTrajectoryTrigger = true;
                 }
                 else    //I still need to assign a value to the flag
                 {
@@ -1263,7 +1264,7 @@ bool WalkingModule::updateModule()
                 }
             }
         }
-        
+
         if (saveCoM)
         {
             std::cout << "Double Support! : Saving CoM trajectory" << std::endl;
@@ -1988,62 +1989,97 @@ void WalkingModule::computeVirtualUnicycleThread()
 void WalkingModule::computeNavigationTrigger()
 {
     std::cout << "Starting computeNavigationTrigger" << std::endl;
-
-    int loopRate = 10;
+    bool searchCoM = false;
+    int loopRate = 100;
     bool enteredDoubleSupport = false, exitDoubleSupport = true;
+    NavTriggerFSM stanceState = NavTriggerFSM::WaitingForGoal;
     while (true)
     {
-        //get current CoM in odom frame
-        iDynTree::Vector2 plannedCoMPosition = m_stableDCMModel->getCoMPosition(); //actual planned CoM in the robot frame for the next dT (istant) of time
-        //std::cout << "CoM Position X: " << plannedCoMPosition(0) << " Y: " << plannedCoMPosition(1) << std::endl;
-
-        //double support check
-        if (m_leftInContact.size()>0 && m_rightInContact.size()>0)  //external consistency check
+        //Check the state of the robot is in Walking mode, otherwise will throw exceptions for accessing some variables
+        if (m_robotState != WalkingFSM::Walking)
         {
-            if (m_leftInContact[0] && m_rightInContact[0])
+            //Skip the loop
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
+            continue;
+        }
+
+        //STATE MACHINE state variable selector: if the robot is standing still
+        if (m_isStancePhase.at(0))
+            stanceState = NavTriggerFSM::WaitingForGoal;
+        else
+            stanceState = NavTriggerFSM::ExecutingGoal;
+        
+        //Switch of the State Machine
+        switch (stanceState)
+        {
+        case NavTriggerFSM::WaitingForGoal:
+        {
+            //std::cout << "WaitingForGoal: triggering" << std::endl;
+            auto& b = m_replanningTriggerPort.prepare();
+            b.clear();
+            b.add((yarp::os::Value)true);   //send the planning trigger
+            m_replanningTriggerPort.write();
+            break;
+        }
+        case NavTriggerFSM::ExecutingGoal:
+        {
+            if (searchCoM)
             {
-                if (exitDoubleSupport)
+                //get current CoM in odom frame
+                iDynTree::Vector2 plannedCoMPosition = m_stableDCMModel->getCoMPosition(); //actual planned CoM in the robot frame for the next dT (istant) of time
+                //search the actual CoM on the trajectory
+
+                int index = -1;
+                for (size_t i = 0; i < m_desiredCoM_Trajectory.size(); ++i)
                 {
-                    enteredDoubleSupport = true;
-                    exitDoubleSupport = false;
+                    double distance = std::sqrt(std::pow(m_desiredCoM_Trajectory[i](0) - plannedCoMPosition(0), 2) + 
+                                                std::pow(m_desiredCoM_Trajectory[i](1) - plannedCoMPosition(1), 2));
+                    if (distance < 0.001)
+                    {
+                        index = i;
+                        //std::cout << "Found planned CoM position at index: " << i << " with distance: " << distance << std::endl;
+                        //TODO ADD TRIGGER CONDITION
+
+
+                        if (index>=50)
+                        {
+                            auto& b = m_replanningTriggerPort.prepare();
+                            b.clear();
+                            b.add((yarp::os::Value)true);   //send the planning trigger
+                            m_replanningTriggerPort.write();
+                            std::cout << "triggering" << std::endl;
+                            std::cout << "Found planned CoM position at index: " << i << " with distance: " << distance << std::endl;
+                        }
+
+                        break;
+                    }
+                }
+
+                if (index == -1)
+                {
+                    std::cout << "Wasn't able to find any matching index for current planned CoM on CoM trajectory" << std::endl;
+                    //auto& b = m_replanningTriggerPort.prepare();
+                    //b.clear();
+                    //b.add((yarp::os::Value)true);   //send the stop trigger 
+                    //m_replanningTriggerPort.write();
                 }
             }
             else
             {
-                exitDoubleSupport = true;
-            }
-        }
-
-        //search the actual CoM on the trajectory
-        int index = -1;
-        for (size_t i = 0; i < m_desiredCoM_Trajectory.size(); ++i)
-        {
-            double distance = std::sqrt(std::pow(m_desiredCoM_Trajectory[i](0) - plannedCoMPosition(0), 2) + 
-                                        std::pow(m_desiredCoM_Trajectory[i](1) - plannedCoMPosition(1), 2));
-            if (distance < 0.001)
-            {
-                index = i;
-                //std::cout << "Found planned CoM position at index: " << i << " with distance: " << distance << std::endl;
-                if (enteredDoubleSupport)
+                if (m_newTrajectoryTrigger)
                 {
-                    enteredDoubleSupport = false;   //I have already elaborated the data
-                    std::cout << "Entered in double support at index: " << i << " with distance: " << distance << std::endl;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(600));
                     auto& b = m_replanningTriggerPort.prepare();
                     b.clear();
                     b.add((yarp::os::Value)true);   //send the planning trigger
                     m_replanningTriggerPort.write();
-                    break;
+                    std::cout << "triggering" << std::endl;
+                    m_newTrajectoryTrigger = false;
                 }
+                
             }
+            break;
         }
-        
-        if (index == -1)
-        {
-            std::cout << "Wasn't able to find any matching index for current planned CoM on CoM trajectory" << std::endl;
-            auto& b = m_replanningTriggerPort.prepare();
-            b.clear();
-            b.add((yarp::os::Value)false);   //send the stop trigger
-            m_replanningTriggerPort.write();
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
     }

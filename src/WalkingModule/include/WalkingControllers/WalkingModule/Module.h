@@ -63,6 +63,7 @@ namespace WalkingControllers
     class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     {
         enum class WalkingFSM {Idle, Configured, Preparing, Prepared, Walking, Paused, Stopped};
+        enum class NavTriggerFSM {WaitingForGoal, ExecutingGoal};
         WalkingFSM m_robotState{WalkingFSM::Idle}; /**< State  of the WalkingFSM. */
 
         double m_dT; /**< RFModule period. */
@@ -139,6 +140,7 @@ namespace WalkingControllers
 
         bool m_newTrajectoryRequired; /**< if true a new trajectory will be merged soon. (after m_newTrajectoryMergeCounter - 2 cycles). */
         bool m_newTrajectoryMerged; /**< true if a new trajectory has been just merged. */
+        bool m_newTrajectoryTrigger; /**< true if a new trajectory has been just merged and used by the trigger for the navigation planning. */
         size_t m_newTrajectoryMergeCounter; /**< The new trajectory will be merged after m_newTrajectoryMergeCounter - 2 cycles. */
 
         bool m_useRootLinkForHeight;
