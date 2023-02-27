@@ -1895,17 +1895,27 @@ void WalkingModule::computeVirtualUnicycleThread()
     bool inContact = false;
     while (true)
     {
+        if (m_robotState != WalkingFSM::Walking)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
+            continue;
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
         iDynTree::Vector3 virtualUnicyclePose, virtualUnicycleReference;
         std::string stanceFoot;
         iDynTree::Transform footTransformToWorld, root_linkTransform;
+        if(m_FKSolver == nullptr)
+        {
+            yInfo() << "[computeVirtualUnicycleThread] The FK solver is not ready.";
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
+            continue;
+        }
         //Stance foot check
         if (m_leftInContact.size() > 0)
         {
             if (m_leftInContact.at(0))
             {
                 stanceFoot = "left";
-                root_linkTransform = 
                 footTransformToWorld = m_FKSolver->getLeftFootToWorldTransform();
             }
             else
