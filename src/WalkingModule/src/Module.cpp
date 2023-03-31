@@ -798,7 +798,12 @@ bool WalkingModule::updateModule()
         if(desiredUnicyclePosition != nullptr)
         {
             m_debugMergeTime = yarp::os::Time::now();
-            //applyGoalScaling(*desiredUnicyclePosition);   //removed scaling since we have a variable number of poses
+            //removed applyGoalScaling since we have a variable number of poses for navigation
+            if (m_trajectoryGenerator->m_navigationConfig == NavigationSetup::ManualMode)
+            {
+                applyGoalScaling(*desiredUnicyclePosition);
+            }
+            
             if(!setPlannerInput(*desiredUnicyclePosition))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the planner input";

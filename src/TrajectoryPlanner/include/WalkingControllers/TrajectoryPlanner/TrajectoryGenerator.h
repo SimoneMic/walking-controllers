@@ -73,8 +73,9 @@ namespace WalkingControllers
         iDynTree::Transform m_measuredTransformLeft; /**< Measured transformation between the left foot and the world frame. (w_H_lf) */
         iDynTree::Transform m_measuredTransformRight; /**< Measured transformation between the right foot and the world frame. (w_H_rf) */
 
-        iDynTree::VectorDynSize m_personFollowingDesiredPoint; /**< Desired final position of the x-y projection of the CoM. */
+        iDynTree::Vector2 m_personFollowingDesiredPoint; /**< Desired final position of the x-y projection of the CoM. */
         iDynTree::Vector3 m_desiredDirectControl; /**< Desired control input to send to the Unicycle Planner. */
+        iDynTree::VectorDynSize m_personFollowingDesiredPath; /**< Desired path of waypoints of the x-y projection of the CoM. */
 
         iDynTree::Vector2 m_DCMBoundaryConditionAtMergePointPosition; /**< DCM position at the merge point. */
         iDynTree::Vector2 m_DCMBoundaryConditionAtMergePointVelocity; /**< DCM velocity at the merge point. */
@@ -86,8 +87,6 @@ namespace WalkingControllers
         std::vector<UnicycleState> m_3Dpath; /**< Path of 3D poses (x, y, theta) in the odom reference frame */
         std::vector<iDynTree::Vector2> m_transformed2DPath; /**< Path of 2D poses (x, y) in the robot reference frame */
         std::vector<UnicycleState> m_transformed3DPath; /**< Path of 3D poses (x, y, theta) in the robot reference frame */
-
-        NavigationSetup m_navigationConfig{NavigationSetup::ManualMode};
 
         std::mutex m_mutex; /**< Mutex. */
 
@@ -107,7 +106,7 @@ namespace WalkingControllers
         bool addWaypoints(const Eigen::Vector2d &unicyclePosition, const Eigen::Matrix2d &unicycleRotation, const double initTime, const double endTime);
 
     public:
-
+        NavigationSetup m_navigationConfig{NavigationSetup::ManualMode};
         /**
          * Deconstructor.
          */

@@ -185,7 +185,10 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && unicyclePlanner->setMaxStepLength(maxStepLength);
     ok = ok && unicyclePlanner->setWidthSetting(minWidth, m_nominalWidth);
     ok = ok && unicyclePlanner->setMaxAngleVariation(maxAngleVariation);
-
+    ok = ok && unicyclePlanner->setCostWeights(positionWeight, timeWeight);
+    ok = ok && unicyclePlanner->setStepTimings(minStepDuration,
+                                               maxStepDuration, nominalDuration);
+    
     ok = ok && unicyclePlanner->setPlannerPeriod(m_dT);
     ok = ok && unicyclePlanner->setMinimumAngleForNewSteps(minAngleVariation);
     ok = ok && unicyclePlanner->setMinimumStepLength(minStepLength);
@@ -204,8 +207,6 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && m_trajectoryGenerator.setSwitchOverSwingRatio(switchOverSwingRatio);
     ok = ok && m_trajectoryGenerator.setTerminalHalfSwitchTime(lastStepSwitchTime);
     ok = ok && m_trajectoryGenerator.setPauseConditions(maxStepDuration, nominalDuration);
-
-    ok = ok && unicyclePlanner->setStepTimings(m_minStepDuration, maxStepDuration, nominalDuration);  //added, not present before
 
     m_trajectoryGenerator.setPauseActive(isPauseActive);
 
@@ -265,7 +266,7 @@ void TrajectoryGenerator::computeThread()
 
         bool correctLeft;
 
-        //iDynTree::Vector2 desiredPointInRelativeFrame, desiredPointInAbsoluteFrame;
+        iDynTree::Vector2 desiredPointInRelativeFrame, desiredPointInAbsoluteFrame;
         iDynTree::Vector2 measuredPositionLeft, measuredPositionRight;
         iDynTree::Vector3 desiredDirectControl;
         double measuredAngleLeft, measuredAngleRight;
@@ -292,7 +293,7 @@ void TrajectoryGenerator::computeThread()
             endTime = initTime + m_plannerHorizon;
 
             // set desired point
-            //desiredPointInRelativeFrame = m_personFollowingDesiredPoint;
+            desiredPointInRelativeFrame = m_personFollowingDesiredPoint;
 
             desiredDirectControl = m_desiredDirectControl;
 
@@ -429,7 +430,40 @@ void TrajectoryGenerator::computeThread()
                 yErrorThrottle(1.0) << "[TrajectoryGenerator_Thread] Unable to set the navigation path to the planner.";
             }
         }
-        //TODO do computations for manual mode
+        else if (m_navigationConfig == NavigationSetup::ManualMode)
+        {
+            double s_theta = std::sin(unicycleAngle);
+            double c_theta = std::cos(unicycleAngle);
+
+            unicycleRotation(0,0) = c_theta;
+            unicycleRotation(0,1) = -s_theta;
+            unicycleRotation(1,0) = s_theta;
+            unicycleRotation(1,1) = c_theta;
+
+            unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
+
+            // apply the homogeneous transformation w_H_{unicycle}
+            iDynTree::toEigen(desiredPointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
+                                                                                 iDynTree::toEigen(desiredPointInRelativeFrame))
+                    + unicyclePosition;
+
+            // clear the old trajectory
+            std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
+            unicyclePlanner->clearPersonFollowingDesiredTrajectory();
+
+            // add new point
+            if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(endTime, desiredPointInAbsoluteFrame))
+            {
+                // something goes wrong
+                std::lock_guard<std::mutex> guard(m_mutex);
+                m_generatorState = GeneratorState::Configured;
+                yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
+                break;
+            }
+
+            unicyclePlanner->setDesiredDirectControl(m_desiredDirectControl(0), m_desiredDirectControl(1), m_desiredDirectControl(2));
+        }
+
 
         if (!m_dcmGenerator->setDCMInitialState(initialState)) {
             // something goes wrong
@@ -508,19 +542,18 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Position& in
     double endTime = initTime + m_plannerHorizon;
 
     // at the beginning iCub has to stop
-    iDynTree::Vector2 desiredPositionInGlobalFrame; //removed m_personFollowingDesiredPoint and substituted with desiredPositionInGlobalFrame
-    desiredPositionInGlobalFrame(0) = m_referencePointDistance(0) + initialBasePosition(0);
-    desiredPositionInGlobalFrame(1) = m_referencePointDistance(1) + initialBasePosition(1);
+    m_personFollowingDesiredPoint(0) = m_referencePointDistance(0) + initialBasePosition(0);
+    m_personFollowingDesiredPoint(1) = m_referencePointDistance(1) + initialBasePosition(1);
 
     // add the initial point
-    if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(initTime, desiredPositionInGlobalFrame))
+    if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(initTime, m_personFollowingDesiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the first reference.";
         return false;
     }
 
     // add the final point
-    if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(endTime, desiredPositionInGlobalFrame))
+    if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(endTime, m_personFollowingDesiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the new reference.";
         return false;
@@ -563,14 +596,9 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     double initTime = 0;
     double endTime = initTime + m_plannerHorizon;
     
-    // stop the robot only if I am in person following
-    if (!(m_unicycleController == UnicycleController::PERSON_FOLLOWING))
-    {
-        m_personFollowingDesiredPoint.resize(2);   //resize the dynamic size
-        // at the beginning iCub has to stop
-        m_personFollowingDesiredPoint(0) = m_referencePointDistance(0);
-        m_personFollowingDesiredPoint(1) = m_referencePointDistance(1);
-    }
+    // at the beginning iCub has to stop
+    m_personFollowingDesiredPoint(0) = m_referencePointDistance(0);
+    m_personFollowingDesiredPoint(1) = m_referencePointDistance(1);
 
     // add the initial point
     if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(initTime, m_referencePointDistance))
@@ -580,7 +608,7 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     }
 
     // add the final point
-    if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(endTime, m_referencePointDistance))   //swapped m_personFollowingDesiredPoint with m_referencePointDistance since it's the same
+    if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(endTime, m_personFollowingDesiredPoint))  
     {
         yError() << "[generateFirstTrajectories] Error while setting the new reference.";
         return false;
@@ -658,7 +686,6 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
             return false;
         }
 
-        m_personFollowingDesiredPoint.zero();
         if (m_2Dpath.size() > 0)
         {
             m_2Dpath.clear();
@@ -669,6 +696,7 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
         }
         
         m_personFollowingDesiredPoint.zero();
+        m_personFollowingDesiredPath.zero();
         m_desiredDirectControl.zero();
 
         switch (m_navigationConfig)
@@ -721,8 +749,6 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                 }
                 else
                 {
-                    //Here I should convert the data from VectroDynSize to std::vector<Vector2>
-                    //m_personFollowingDesiredPoint = plannerDesiredInput;
                     if (plannerDesiredInput.size()%2 != 0) 
                     {
                         //not even
@@ -753,7 +779,6 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                         tmp_pose.position(0) = .0;      //x
                         tmp_pose.position(1) = .0;      //y
                         tmp_pose.angle = .0;            //theta
-                        //tmp_pose.push_back(tmp_pose);
                         m_3Dpath.push_back(tmp_pose);
                     }
                 }
@@ -770,8 +795,8 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                     }
                 }
                 yInfo()<<"Setting Navigation Path of size: " << m_3Dpath.size();
-                //Old code -> overwriting to zero to avoid conflicts
-                m_desiredDirectControl(0) = 0.0;    //=plannerDesiredInput(0);
+                //Overwriting to zero to avoid conflicts
+                m_desiredDirectControl(0) = 0.0;
                 m_desiredDirectControl(1) = 0.0;
                 m_desiredDirectControl(2) = 0.0;
             }
@@ -779,6 +804,7 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
         
         default:    //NotConfigured -> ERROR
             yErrorThrottle(1.0) << "[updateTrajectories] The NavigationSetup is NotConfigured: please, update the config file." ;
+            return false;
             break;
         }
 
@@ -828,7 +854,7 @@ bool TrajectoryGenerator::addWaypoints(const Eigen::Vector2d &unicyclePosition, 
         {
             // path is a vector of (x, y, theta) pose vectors in the robot frame
             double relativePoseDistance = sqrt(pow(m_2Dpath.at(i)[0] - m_2Dpath.at(i-1)[0], 2) + 
-                                   pow(m_2Dpath.at(i)[1] - m_2Dpath.at(i-1)[1], 2));
+                                                pow(m_2Dpath.at(i)[1] - m_2Dpath.at(i-1)[1], 2));
             double eta = relativePoseDistance / approxSpeed(0); // expected time passing between two consecutive poses
             elapsedTime += eta;
             if (elapsedTime > endTime)   // exit condition -> if I am exceeding the time horizon
