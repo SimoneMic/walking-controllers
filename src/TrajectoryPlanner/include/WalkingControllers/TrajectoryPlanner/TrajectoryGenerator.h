@@ -54,6 +54,8 @@ namespace WalkingControllers
         double m_rightYawDeltaInRad; /**< Offset for the right foot rotation around the z axis. */
         double m_nominalWidth; /**< Nominal width between two feet. */
         double m_initTime; /**< Init time of the current trajectory. */
+        double m_minStepDuration; /**< Minimum step duration. */
+        double m_maxStepLength; /**< Max step lenght. */
 
         iDynTree::Vector2 m_referencePointDistance; /**< Vector between the center of the unicycle and the point that has to be reach the goal. */
 
@@ -75,12 +77,29 @@ namespace WalkingControllers
         FreeSpaceEllipse m_freeSpaceEllipse; /**< The free space ellipse object. */
         bool m_newFreeSpaceEllipse; /**< Check if the free space ellipse has been updated. */
 
+        std::vector<iDynTree::Vector2> m_2Dpath; /**< Path of 2D poses (x, y) in the odom reference frame */
+        std::vector<UnicycleState> m_3Dpath; /**< Path of 3D poses (x, y, theta) in the odom reference frame */
+        std::vector<iDynTree::Vector2> m_transformed2DPath; /**< Path of 2D poses (x, y) in the robot reference frame */
+        std::vector<UnicycleState> m_transformed3DPath; /**< Path of 3D poses (x, y, theta) in the robot reference frame */
+
+        bool m_navigationMode;  /**< Flag that indicates if the controller is running in navigation mode */
+
         std::mutex m_mutex; /**< Mutex. */
 
         /**
          * Main thread method.
          */
         void computeThread();
+
+        /**
+         * Add each pose present in the path as a waypoint to the planner in the robot frame
+         * @param unicyclePosition the position of the robot wrt the world frame
+         * @param unicycleRotation rotation matrix to transform the robot in the world frame
+         * @param initTime initial time of the first pose of the path
+         * @param endTime equal to initialTime plus the planner horizon
+         * @return true/false in case of success/failure.
+         */
+        bool addWaypoints(const Eigen::Vector2d &unicyclePosition, const Eigen::Matrix2d &unicycleRotation, const double initTime, const double endTime);
 
     public:
 
