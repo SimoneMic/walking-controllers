@@ -202,6 +202,9 @@ void NavigationHelper::computeNavigationTrigger()
             auto& b = m_replanningTriggerPort.prepare();
             b.clear();
             b.add((yarp::os::Value)true);   //send the planning trigger
+            //Timestamp
+            yarp::os::Stamp stamp(0, yarp::os::Time::now());
+            m_replanningTriggerPort.setEnvelope(stamp);
             m_replanningTriggerPort.write();
         }
         
@@ -303,6 +306,19 @@ void NavigationHelper::computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &
                 auto& velData = data.addList();
                 velData.addFloat64(comVel(0));
                 velData.addFloat64(comVel(1));
+                //TODO add angular velocity
+                velData.addFloat64(0.0);
+
+                //measured velocity of the root link
+                auto measuredVel = FKSolver->getRootLinkVelocity();
+                auto& measuredVelData = data.addList();
+                measuredVelData.addFloat64(measuredVel(0));
+                measuredVelData.addFloat64(measuredVel(1));
+                measuredVelData.addFloat64(measuredVel(2));
+                measuredVelData.addFloat64(measuredVel(3));
+                measuredVelData.addFloat64(measuredVel(4));
+                measuredVelData.addFloat64(measuredVel(5));
+
                 m_unicyclePort.write();
             }
             else
@@ -337,6 +353,9 @@ bool NavigationHelper::publishPlannedFootsteps(std::unique_ptr<TrajectoryGenerat
             feetData.clear();
             auto& rightFeet = feetData.addList();
             auto& leftFeet = feetData.addList();
+            //Timestamp
+            yarp::os::Stamp stamp(0, yarp::os::Time::now());
+            m_feetPort.setEnvelope(stamp);
             //left foot
             for (size_t i = 0; i < leftFootprints.size(); ++i)
             {
