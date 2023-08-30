@@ -383,7 +383,7 @@ void TrajectoryGenerator::computeThread()
             iDynTree::Position postion2D;
             postion2D(0) = unicyclePosition(0);
             postion2D(1) = unicyclePosition(1);
-            postion2D(2) = 0;
+            postion2D(2) = 0.0;
             //3d Rot around Z (theta)
             iDynTree::Rotation unicycleRot (c_theta,-s_theta, 0.0,
                                             s_theta, c_theta, 0.0,
@@ -391,12 +391,12 @@ void TrajectoryGenerator::computeThread()
             //Compose TF
             iDynTree::Transform TF(unicycleRot, postion2D);
             std::vector<UnicycleState> transformed3DPath;
-            for (size_t i = 0; i < m_3Dpath.size(); ++i)
+            for (size_t i = 1; i < m_3Dpath.size(); ++i)    //the first pose is (0, 0, 0) should not be transformed
             {
                 iDynTree::Position pos;
                 pos(0) = m_3Dpath.at(i).position(0);    //x
                 pos(1) = m_3Dpath.at(i).position(1);    //y
-                pos(2) = 0;                             //z
+                pos(2) = 0.0;                           //z
 
                 pos = TF*pos;   //apply transform
                 UnicycleState transformedPose;
