@@ -22,7 +22,8 @@
 #include <yarp/os/RpcClient.h>
 
 
-#include <BipedalLocomotion/YarpUtilities/VectorsCollection.h>
+#include <BipedalLocomotion/YarpUtilities/VectorsCollectionServer.h>
+#include <BipedalLocomotion/Contacts/GlobalCoPEvaluator.h>
 
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
@@ -40,9 +41,6 @@
 #include <WalkingControllers/SimplifiedModelControllers/ZMPController.h>
 
 #include <WalkingControllers/WholeBodyControllers/InverseKinematics.h>
-#include <WalkingControllers/WholeBodyControllers/QPInverseKinematics.h>
-#include <WalkingControllers/WholeBodyControllers/QPInverseKinematics_osqp.h>
-#include <WalkingControllers/WholeBodyControllers/QPInverseKinematics_qpOASES.h>
 
 #include <WalkingControllers/KinDynWrapper/Wrapper.h>
 
@@ -74,8 +72,6 @@ namespace WalkingControllers
 
         bool m_useMPC; /**< True if the MPC controller is used. */
         bool m_useQPIK; /**< True if the QP-IK is used. */
-        bool m_useBLFIK; /**< True if the BLF-IK is used. */
-        bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
         bool m_dumpData; /**< True if data are saved. */
         bool m_firstRun; /**< True if it is the first run. */
         bool m_skipDCMController; /**< True if the desired ZMP should be used instead of the DCM controller. */
@@ -85,13 +81,6 @@ namespace WalkingControllers
         iDynTree::Position m_zmpOffset; /** < Offset reading the zmp at the beginning*/
         iDynTree::Position m_zmpOffsetLocal; /** < Offset in the local frame*/
 
-        iDynTree::Vector2 m_previousZMP; /**< Previous ZMP value to check if the ZMP was constant for a while. */
-        int m_constantZMPCounter; /**< Counter to check for how long the ZMP was constant. */
-        double m_constantZMPTolerance; /**< Tolerance to consider the ZMP constant. */
-        int m_constantZMPMaxCounter; /**< Max counter value for triggering the error on the constant measured ZMP. */
-        double m_minimumNormalForceZMP; /**< Minimum force value to consider a contact stable. */
-        iDynTree::Vector2 m_maxZMP; /**< Max value to consider the local ZMP valid. */
-
         std::unique_ptr<RobotInterface> m_robotControlHelper; /**< Robot control helper. */
         std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
         std::unique_ptr<FreeSpaceEllipseManager> m_freeSpaceEllipseManager; /**< Pointer to the free space ellipse manager. */
@@ -99,13 +88,13 @@ namespace WalkingControllers
         std::unique_ptr<WalkingDCMReactiveController> m_walkingDCMReactiveController; /**< Pointer to the walking DCM reactive controller object. */
         std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */
         std::unique_ptr<WalkingIK> m_IKSolver; /**< Pointer to the inverse kinematics solver. */
-        std::unique_ptr<WalkingQPIK> m_QPIKSolver; /**< Pointer to the inverse kinematics solver. */
         std::unique_ptr<BLFIK> m_BLFIKSolver; /**< Pointer to the integration based ik. */
         std::unique_ptr<WalkingFK> m_FKSolver; /**< Pointer to the forward kinematics solver. */
         std::unique_ptr<StableDCMModel> m_stableDCMModel; /**< Pointer to the stable DCM dynamics. */
         std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
         std::unique_ptr<RetargetingClient> m_retargetingClient; /**< Pointer to the stable DCM dynamics. */
         std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
+        BipedalLocomotion::Contacts::GlobalCoPEvaluator m_globalCoPEvaluator;
 
         double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
         double m_desiredJointsWeight; /**< Desired joint weight matrix. */
@@ -163,7 +152,7 @@ namespace WalkingControllers
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
-        yarp::os::BufferedPort<BipedalLocomotion::YarpUtilities::VectorsCollection> m_loggerPort; /**< Logger port. */
+        BipedalLocomotion::YarpUtilities::VectorsCollectionServer m_vectorsCollectionServer; /**< Logger server. */
 
         std::chrono::high_resolution_clock::time_point m_startTime;
 
@@ -185,7 +174,6 @@ namespace WalkingControllers
          */
         bool advanceReferenceSignals();
 
-
         /**
          * Update the FK solver.
          * @return true in case of success and false otherwise.
@@ -194,29 +182,23 @@ namespace WalkingControllers
 
         /**
          * Set the QP-IK problem.
-         * @param solver is the pointer to the solver (osqp or qpOASES)
          * @param desiredCoMPosition desired CoM position;
          * @param desiredCoMVelocity desired CoM velocity;
          * @param desiredNeckOrientation desired neck orientation (rotation matrix);
          * @param output is the output of the solver (i.e. the desired joint velocity)
          * @return true in case of success and false otherwise.
          */
-        bool solveQPIK(const std::unique_ptr<WalkingQPIK>& solver,
-                       const iDynTree::Position& desiredCoMPosition,
-                       const iDynTree::Vector3& desiredCoMVelocity,
-                       const iDynTree::Rotation& desiredNeckOrientation,
-                       iDynTree::VectorDynSize &output);
-
         bool solveBLFIK(const iDynTree::Position& desiredCoMPosition,
                         const iDynTree::Vector3& desiredCoMVelocity,
                         const iDynTree::Rotation& desiredNeckOrientation,
                         iDynTree::VectorDynSize &output);
+
         /**
-         * Evaluate the position of Zero momentum point.
-         * @param zmp zero momentum point.
+         * Compute Global CoP.
+         * @param globalCoP is the global CoP.
          * @return true in case of success and false otherwise.
          */
-        bool evaluateZMP(iDynTree::Vector2& zmp);
+        bool computeGlobalCoP(Eigen::Ref<Eigen::Vector2d> globalCoP);
 
         /**
          * Given the two planned feet, it computes the average yaw rotation
