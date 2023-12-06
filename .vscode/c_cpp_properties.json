@@ -4,11 +4,11 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/home/user1/robotology-superbuild/build/src/walking-controllers/src/WalkingModule/",
-                "/home/user1/robotology-superbuild/build/install/include/**",
-                "/home/user1/robotology-superbuild/build/install/include/BipedalLocomotion/ParametersHandler/**",
-                "/home/user1/robotology-superbuild/build/install/include/BipedalLocomotion/**",
-                "/home/user1/robotology-superbuild/build/install/include/OsqpEigen/**",
+                "/home/ecub_docker/robotology-superbuild/build/src/walking-controllers/src/WalkingModule/",
+                "/home/ecub_docker/robotology-superbuild/build/install/include/**",
+                "/home/ecub_docker/robotology-superbuild/build/install/include/BipedalLocomotion/ParametersHandler/**",
+                "/home/ecub_docker/robotology-superbuild/build/install/include/BipedalLocomotion/**",
+                "/home/ecub_docker/robotology-superbuild/build/install/include/OsqpEigen/**",
                 "/usr/include/eigen3"
             ],
             "defines": [],

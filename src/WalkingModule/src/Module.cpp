@@ -494,9 +494,6 @@ void WalkingModule::applyGoalScaling(yarp::sig::Vector &plannerInput)
 
 bool WalkingModule::close()
 {
-    if(m_dumpData)
-        m_loggerPort.close();
-    
     if(m_navHelperUsed)
         m_navHelper.closeHelper();
 
