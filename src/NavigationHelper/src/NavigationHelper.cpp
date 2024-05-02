@@ -109,7 +109,7 @@ bool NavigationHelper::init(const yarp::os::Searchable& config,
         yError() << "[configure] navigationTriggerLoopRate must be positive, instead is: " << m_navigationReplanningDelay;
         return false;
     }
-    
+
     //ports for navigation integration
     std::string unicyclePortPortName = m_portPrefix + "/virtual_unicycle_states:o";
     yarp::os::Contact unicyclePortContact{unicyclePortPortName, "shmem" };
@@ -158,7 +158,7 @@ void NavigationHelper::computeNavigationTrigger()
     while (m_runThreads)
     {
         {
-            std::unique_lock<std::mutex> lock(m_updateFeetMutex);
+            //std::lock_guard<std::mutex> lock(m_updateFeetMutex);
             if (m_leftInContact.size()>0 && m_rightInContact.size()>0)  //external consistency check
             {
                 if (m_leftInContact.at(0) && m_rightInContact.at(0))    //double support check
@@ -380,7 +380,7 @@ bool NavigationHelper::publishPlannedFootsteps(std::unique_ptr<TrajectoryGenerat
 
 bool NavigationHelper::updateFeetDeques(const std::deque<bool> &left, const std::deque<bool> &right)
 {
-    std::unique_lock<std::mutex> lock(m_updateFeetMutex);
+    //std::unique_lock<std::mutex> lock(m_updateFeetMutex);
     m_leftInContact = left;
     m_rightInContact = right;
     return true;

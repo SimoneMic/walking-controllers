@@ -460,12 +460,19 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     // start the threads used for computing navigation needed infos
     if (!navigationOptions.isNull())
     {
-        m_navHelperUsed = true;
-        if(!m_navHelper.init(navigationOptions, m_FKSolver, m_stableDCMModel, m_trajectoryGenerator))
+        if (navigationOptions.check("plannerMode", yarp::os::Value("manual")).asString() == "navigation")
         {
-            yError() << "[WalkingModule::configure] Could not initialize the Navigation Helper";
+            m_navHelperUsed = true;
+            if(!m_navHelper.init(navigationOptions, m_FKSolver, m_stableDCMModel, m_trajectoryGenerator))
+            {
+                yError() << "[WalkingModule::configure] Could not initialize the Navigation Helper";
+            }
+            yInfo() << "[WalkingModule::configure] Configured Navigation Helper.";
         }
-        yInfo() << "[WalkingModule::configure] Configured Navigation Helper.";
+        else
+        {
+            m_navHelperUsed = false;
+        }
     }
     else
     {
