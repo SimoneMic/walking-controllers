@@ -83,6 +83,7 @@ bool NavigationHelper::init(const yarp::os::Searchable& config,
                         std::unique_ptr<StableDCMModel> &stableDCMModel, 
                         std::unique_ptr<TrajectoryGenerator> &trajectoryGenerator)
 {
+    yInfo() << "Initializing NavigationHelper";
     m_navigationReplanningDelay = config.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
     m_navigationTriggerLoopRate = config.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
     m_publishInfo = config.check("publishNavigationInfo", yarp::os::Value(false)).asBool();
@@ -95,6 +96,7 @@ bool NavigationHelper::init(const yarp::os::Searchable& config,
     if (!m_publishInfo)
     {   //exit the funnction if the infos are not needed
         yInfo() << "[NavigationHelper::init] Configuring NavigationHelper without publishing infos on ports ";
+        m_publishInfo = false;
         return true;
     }
 
@@ -136,6 +138,7 @@ bool NavigationHelper::init(const yarp::os::Searchable& config,
     m_runThreads = true;
     m_virtualUnicyclePubliserThread = std::thread(&NavigationHelper::computeVirtualUnicycleThread, this, std::ref(FKSolver), std::ref(stableDCMModel), std::ref(trajectoryGenerator));
     m_navigationTriggerThread = std::thread(&NavigationHelper::computeNavigationTrigger, this);
+    yInfo() << "[NavigationHelper::init] Configuring NavigationHelper Correctly ";
     return true;
 }
 

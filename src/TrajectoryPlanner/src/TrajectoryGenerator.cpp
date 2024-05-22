@@ -58,6 +58,8 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double unicycleGain = config.check("unicycleGain", yarp::os::Value(10.0)).asFloat64();
     double stancePhaseDelaySeconds = config.check("stance_phase_delay",yarp::os::Value(0.0)).asFloat64();
 
+    yInfo() << "[TrajectoryGenerator::configurePlanner] sampling_time: " << m_dT << " plannerHorizon: " << m_plannerHorizon << " unicycleGain: " << unicycleGain << " stancePhaseDelaySeconds: " << stancePhaseDelaySeconds;
+
     m_stancePhaseDelay = (std::size_t) std::round(stancePhaseDelaySeconds / m_dT);
 
     if(!YarpUtilities::getVectorFromSearchable(config, "referencePosition", m_referencePointDistance))
@@ -219,6 +221,10 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     m_correctLeft = true;
 
     m_newFreeSpaceEllipse = false;
+
+    yInfo() << "[TrajectoryGenerator::configurePlanner] maxStepDuration: " << maxStepDuration << " nominalDuration: " << nominalDuration << " minStepDuration: " << minStepDuration;
+    yInfo() << "[TrajectoryGenerator::configurePlanner] minAngleVariation: " << minAngleVariation << " maxAngleVariation: " << maxAngleVariation << " minStepLength: " << minStepLength << " maxStepLength: " << maxStepLength;
+    yInfo() << "[TrajectoryGenerator::configurePlanner] minWidth: " << minWidth << " nominalWidth: " << m_nominalWidth << " apexTime: " << apexTime << " unicycleController: " << unicycleController;
 
     if(ok)
     {
